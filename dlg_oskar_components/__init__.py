@@ -3,7 +3,6 @@ __package__ = "dlg_oskar_components"
 from dlg import droputils, utils
 
 # extend the following as required
-from .apps import MyAppDROP
-from .data import MyDataDROP
+from .apps import OSKARInterferometer
 
-__all__ = ["MyAppDROP", "MyDataDROP"]
+__all__ = ["OSKARInterferometer"]
