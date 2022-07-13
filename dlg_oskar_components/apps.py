@@ -19,6 +19,7 @@ from dlg.meta import (
     dlg_batch_input,
     dlg_batch_output,
     dlg_bool_param,
+    dlg_float_param,
     dlg_component,
     dlg_streaming_input,
     dlg_string_param,
@@ -43,6 +44,21 @@ logger = logging.getLogger(__name__)
 #     \~English Whether to use double (true) or float (false) precision.
 # @param[in] aparam/usegpu Use GPU/false/Boolean/readwrite/
 #     \~English Whether to use gpu capabilities (true) or CPU only (false).
+# @param[in] aparam/channel_bandwidth_hz Channel bandwith/0/Double/readwrite/
+#     \~English The channel width, in Hz, used to simulate bandwidth smearing.
+#     (Note that this can be different to the frequency increment if channels do not cover
+#     a contiguous frequency range.)
+# @param[in] aparam/time_average_sec Time average/0/Double/readwrite/
+#     \~English The correlator time-average duration, in seconds,
+#     used to simulate time averaging smearing.
+# @param[in] aparam/force_polarised_ms Force polarisation/false/Boolean/readwrite/
+#     \~English If True, always write the Measurment Set in polarised format even if the simulation
+#     was run in the single polarisation ‘Scalar’ (or Stokes-I) mode.
+#     If False, the size of the polarisation dimension in the the
+#     Measurement Set will be determined by the simulation mode.
+# @param[in] aparam/ignore_w_components Ignore w components/false/Boolean/readwrite/
+#     \~English If enabled, baseline W-coordinate component values will be set to 0.
+#     This will disable W-smearing. Use only if you know what you’re doing!
 # @param[in] port/settings Settings Tree String/Json/
 #     \~English String representation of OSKAR settings tree
 # @param[in] port/skymodel Sky Model/String/
@@ -66,6 +82,10 @@ class OSKARInterferometer(BarrierAppDROP):
 
     doubleprecision = dlg_bool_param("doubleprecision", True)
     usegpu = dlg_bool_param("usegpu", False)
+    channel_bandwidth_hz = dlg_float_param("channel_bandwidth_hz", 0.0)
+    time_average_sec = dlg_float_param("time_average_sec", 0.0)
+    force_polarised_ms = dlg_bool_param("force_polarised_ms", False)
+    ignore_w_components = dlg_bool_param("ignore_w_components", False)
 
     def initialize(self, **kwargs):
         super(OSKARInterferometer, self).initialize(**kwargs)
@@ -99,8 +119,10 @@ class OSKARInterferometer(BarrierAppDROP):
             "interferometer": {
                 "oskar_vis_filename": self.outputs[0].path,
                 "ms_filename": "",
-                "channel_bandwidth_hz": 1e6,
-                "time_average_sec": 10
+                "channel_bandwidth_hz": self.channel_bandwidth_hz,
+                "time_average_sec": self.time_average_sec,
+                "force_polarised_ms": self.force_polarised_ms,
+                "ignore_w_components": self.ignore_w_components
             }
         }
         settings = oskar.SettingsTree("oskar_sim_interferometer")
