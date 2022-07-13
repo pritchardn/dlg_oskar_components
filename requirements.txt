@@ -1,3 +1,8 @@
 daliuge-engine>=2.0
 daliuge-translator>=2.0
-oskarpy
+oskarpy~=0.2.1
+pytest~=7.1.2
+setuptools~=60.2.0
+numpy~=1.22.4
+matplotlib~=3.5.2
+argparse~=1.4.0
