@@ -12,6 +12,7 @@ Be creative! do whatever you need to do!
 import logging
 import io
 import numpy as np
+import json
 import oskar
 import matplotlib.pyplot as plt
 
@@ -26,9 +27,11 @@ from dlg.meta import (
     dlg_streaming_input,
     dlg_string_param,
 )
-from dlg.droputils import load_npy
+from dlg.droputils import load_npy, allDropContents
+from dlg.parset_drop import ParameterSetDROP, DEFAULT_INTERNAL_PARAMETERS
 
 logger = logging.getLogger(__name__)
+
 
 ##
 # @brief OSKARInterferometer
@@ -92,6 +95,9 @@ class OSKARInterferometer(BarrierAppDROP):
     def initialize(self, **kwargs):
         super(OSKARInterferometer, self).initialize(**kwargs)
 
+    def _fetch_config(self):
+        return json.loads(allDropContents(self.inputs[2]))
+
     def run(self):
         """
         The run method is mandatory for DALiuGE application components.
@@ -105,16 +111,7 @@ class OSKARInterferometer(BarrierAppDROP):
             "simulator": {
                 "use_gpus": self.usegpu
             },
-            "observation": {
-                "num_channels": 3,
-                "start_frequency_hz": 100e6,
-                "frequency_inc_hz": 20e6,
-                "phase_centre_ra_deg": 20,
-                "phase_centre_dec_deg": -30,
-                "num_time_steps": 24,
-                "start_time_utc": "01-01-2000 12:00:00.000",
-                "length": "12:00:00.000"
-            },
+            "observation": self._fetch_config(),
             "telescope": {
                 "input_directory": self.inputs[0].path  # TODO: support named ports
             },
@@ -151,6 +148,7 @@ class OSKARInterferometer(BarrierAppDROP):
         sim = oskar.Interferometer(settings=settings)
         sim.set_sky_model(sky)
         sim.run()
+
 
 ##
 # @brief OSKARImager
@@ -257,7 +255,6 @@ class OSKARImager(BarrierAppDROP):
         """
         The run method is mandatory for DALiuGE application components.
         """
-        import os.path
         params = {
             "image": {
                 "double_precision": 'true' if self.doubleprecision else 'false',
@@ -276,12 +273,11 @@ class OSKARImager(BarrierAppDROP):
                 "uv_filter_max": self.uv_filter_max,
                 "algorithm": self.algorithm,
                 "weighting": self.weighting,
-                #"u_wavelengths": self.u_wavelengths,
-                #"v_wavelengths": self.v_wavelengths,
+                # "u_wavelengths": self.u_wavelengths,
+                # "v_wavelengths": self.v_wavelengths,
                 "input_vis_data": self.inputs[0].path
             }
         }
-
         settings = oskar.SettingsTree("oskar_imager")
         settings.from_dict(params)
         imager = oskar.Imager(settings=settings)
