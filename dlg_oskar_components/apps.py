@@ -11,12 +11,16 @@ Be creative! do whatever you need to do!
 """
 import logging
 import io
+from typing import List
+
 import numpy as np
 import json
 import oskar
 import matplotlib.pyplot as plt
+import dlg.droputils
 
 from dlg.drop import BarrierAppDROP, BranchAppDrop
+from dlg.exceptions import DaliugeException
 from dlg.meta import (
     dlg_batch_input,
     dlg_batch_output,
@@ -291,3 +295,64 @@ class OSKARImager(BarrierAppDROP):
         plt.savefig(out_io)
         out_io.seek(0)
         self.outputs[0].write(out_io.getbuffer())
+
+
+##
+# @brief OSKARConfigScatter
+# @details An app which splits an OSKAR observation configuration by frequency
+# @par EAGLE_START
+# @param category PythonApp
+# @param construct Scatter
+# @param[in] cparam/appclass Application Class/dlg_oskar_components.OSKARConfigScatter/String/readonly/False//False/
+#     \~English Application class
+# @param[in] cparam/execution_time Execution Time/5/Float/readonly/False//False/
+#     \~English Estimated execution time
+# @param[in] cparam/num_cpus No. of CPUs/1/Integer/readonly/False//False/
+#     \~English Number of cores used
+# @param[in] cparam/group_start Group start/False/Boolean/readwrite/False//False/
+#     \~English Is this node the start of a group?
+# @param[in] cparam/input_error_threshold "Input error rate (%)"/0/Integer/readwrite/False//False/
+#     \~English the allowed failure rate of the inputs (in percent), before this component goes to ERROR state and is not executed
+# @param[in] cparam/n_tries Number of tries/1/Integer/readwrite/False//False/
+#     \~English Specifies the number of times the 'run' method will be executed before finally giving up
+# @param[in] port/config Config/Json/
+#     \~English The original global configuration file.
+# @param[out] port/config Sub-Config/Json/
+#     \~English A valid OSKAR observation json for each output
+# @par EAGLE_END
+class OSKARConfigScatter(BarrierAppDROP):
+    component_meta = dlg_component(
+        "OSKARConfigScatter",
+        "Splits an OSKAR observation configuration by frequency",
+        [dlg_batch_input("binary/*", [])],
+        [dlg_batch_output("binary/*", [])],
+        [dlg_streaming_input("binary/*")],
+    )
+
+    # automatically populated by scatter node
+    num_of_copies: int = dlg_int_param("num_of_copies", 1)
+    START_FREQ_FETCH = "start_frequency_hz"
+    FREQ_INCR = "frequency_inc_hz"
+    NUM_CHANNELS = "num_channels"
+
+    def run(self):
+        if len(self.inputs) * self.num_of_copies != len(self.outputs):
+            raise DaliugeException(
+                f"expected {len(self.inputs) * self.num_of_copies} outputs,\
+                 got {len(self.outputs)}"
+            )
+
+        original_config = json.loads(allDropContents(self.inputs[0]))
+        start_frequency = original_config.get(self.START_FREQ_FETCH, 100e6)
+        num_channels_total = original_config.get(self.NUM_CHANNELS, 6)
+        frequency_increment = original_config.get(self.FREQ_INCR, 20e6)
+
+        num_channels_local = num_channels_total // self.num_of_copies
+
+        for i in range(len(self.outputs)):
+            local_start_frequency = start_frequency + (frequency_increment * num_channels_local * i)
+            i_config = original_config.copy()
+            i_config[self.START_FREQ_FETCH] = local_start_frequency
+            i_config[self.NUM_CHANNELS] = num_channels_local
+            logger.debug(json.dumps(i_config, indent=4))
+            self.outputs[i].write(json.dumps(i_config).encode("utf-8"))
